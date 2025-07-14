@@ -5,15 +5,24 @@ import urllib.parse
 app = Flask(__name__)
 wikipedia.set_lang("es")
 
-@app.route("/search/<path:q>")  # ¡Asegúrate de incluir /search/!
+@app.route("/search/<path:q>")
 def respuesta(q):
-    q = urllib.parse.unquote(q).replace("+", " ").strip()  # Convierte "leon+s+kennedy" → "leon s kennedy"
     try:
-        return wikipedia.summary(q, auto_suggest=False, sentences=2)[:400]
-    except wikipedia.exceptions.PageError:
-        return f"No encontré '{q}'. ¿Quisiste decir algo más?"
+        q = urllib.parse.unquote(q).replace("+", " ").strip().lower()
+        
+        # Paso 1: Búsqueda con sugerencias (para términos ambiguos)
+        sugerencias = wikipedia.search(q, results=3)
+        if not sugerencias:
+            return f"🔍 No encontré '{q}'. Prueba con: !p \"Término exacto\""
+        
+        # Paso 2: Usar el primer resultado relevante
+        pagina = wikipedia.page(sugerencias[0], auto_suggest=False)
+        return f"📚 {pagina.title}: {pagina.summary[:350]}..."  # Límite de caracteres
+        
+    except wikipedia.exceptions.DisambiguationError:
+        return f"⚠️ Hay múltiples opciones para '{q}'. Sé más específico."
     except Exception as e:
-        return "Error al buscar. Prueba más tarde."
+        return f"❌ Error: {str(e)}"
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
